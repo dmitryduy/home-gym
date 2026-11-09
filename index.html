@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Домашние тренировки — план на 12 недель</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="header">
+    <a class="logo" href="#home">Домашний зал<span>.</span></a>
+    <nav class="nav">
+      <a href="#home" data-route="home">Главная</a>
+      <a href="#her" data-route="her">План для неё</a>
+      <a href="#him" data-route="him">План для него</a>
+      <a href="#gallery" data-route="gallery">Упражнения</a>
+      <a href="#basics" data-route="basics">Как тренироваться</a>
+    </nav>
+  </header>
+
+  <main id="app" class="main"></main>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal__backdrop" data-close></div>
+    <div class="modal__body" role="dialog" aria-modal="true">
+      <button class="modal__close" data-close aria-label="Закрыть">×</button>
+      <div id="modal-content"></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    План носит общий характер и не заменяет консультацию врача. Резкая боль — сигнал остановиться.
+  </footer>
+
+  <div id="player" class="player" hidden></div>
+
+  <script src="js/data.js"></script>
+  <script src="js/videos.js"></script>
+  <script src="js/player.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

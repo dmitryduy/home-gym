@@ -45,7 +45,28 @@ function buildSteps(day) {
 
 const restSec = (step) => (step.kind === 'exercise' ? getExRest() : step.sec);
 
+// Не даём экрану погаснуть, пока идёт тренировка
+const wake = { lock: null, wanted: false };
+
+async function requestWakeLock() {
+  if (!wake.wanted || wake.lock || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+  try {
+    wake.lock = await navigator.wakeLock.request('screen');
+    wake.lock.addEventListener('release', () => { wake.lock = null; });
+  } catch (e) { /* браузер отказал: экономия заряда или нет поддержки */ }
+}
+
+function keepScreenOn(on) {
+  wake.wanted = on;
+  if (on) requestWakeLock();
+  else wake.lock?.release();
+}
+
+// Система снимает блокировку, когда вкладка уходит в фон, — берём заново при возврате
+document.addEventListener('visibilitychange', requestWakeLock);
+
 function startWorkout(who, phaseIndex, dayIndex) {
+  keepScreenOn(true);
   const day = PLANS[who].phases[phaseIndex].days[dayIndex];
   Object.assign(run, {
     steps: buildSteps(day), index: 0, who, dayLetter: DAY_KEYS[dayIndex], dayIndex,
@@ -127,6 +148,7 @@ function renderOverview() {
 }
 
 function closePlayer() {
+  keepScreenOn(false);
   clearInterval(run.timer);
   player.hidden = true;
   player.innerHTML = '';
@@ -417,6 +439,7 @@ function markTracker() {
 }
 
 function renderFinish() {
+  keepScreenOn(false);
   clearInterval(run.timer);
   setSheet(false);
   const minutes = Math.round((Date.now() - run.startedAt) / 60000);

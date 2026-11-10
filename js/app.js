@@ -9,7 +9,8 @@ const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&l
 
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const workoutLabel = (dayIndex) => `Тренировка ${dayIndex + 1}`;
-const DAY_KEYS = 'ABC';
+const DAY_KEYS = 'ABCD';
+const TOTAL_SESSIONS = 36;
 
 const ytSearch = (query) => `https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`;
 
@@ -144,9 +145,9 @@ function renderHome() {
     </div>
     <h2>Расписание недели</h2>
     <div class="cards">
-      <div class="card"><h3>Пн — тренировка 1</h3><p class="muted">Вт — отдых или прогулка</p></div>
-      <div class="card"><h3>Ср — тренировка 2</h3><p class="muted">Чт — отдых или йога 20–30 мин</p></div>
-      <div class="card"><h3>Пт — тренировка 3</h3><p class="muted">Сб, Вс — отдых, активность по желанию</p></div>
+      <div class="card"><h3>Пн, Ср, Пт — тренировки</h3><p class="muted">Вт, Чт — отдых, прогулка или йога 20–30 мин. Сб, Вс — отдых.</p></div>
+      <div class="card"><h3>Ей — 3 тренировки</h3><p class="muted">Пн — тренировка 1, Ср — тренировка 2, Пт — тренировка 3.</p></div>
+      <div class="card"><h3>Ему — 4 тренировки по кругу</h3><p class="muted">Грудь и трицепс → пресс → спина и бицепс → ноги и плечи → снова грудь. Каждый раз — следующая по кругу.</p></div>
     </div>`;
 }
 
@@ -154,20 +155,49 @@ function trackerKey(who) {
   return `tracker:${who}`;
 }
 
+const readTracker = (who) => JSON.parse(localStorage.getItem(trackerKey(who)) || '{}');
+const dayCount = (who) => PLANS[who].phases[0].days.length;
+const trackerCols = (who) => Math.ceil(TOTAL_SESSIONS / dayCount(who));
+
+// Следующая тренировка по кругу: первая неотмеченная в порядке 1, 2, 3, 4, 1, 2…
+function nextWorkout(who) {
+  const done = readTracker(who);
+  for (let col = 1; col <= trackerCols(who); col += 1) {
+    for (let d = 0; d < dayCount(who); d += 1) {
+      if (!done[`${col}${DAY_KEYS[d]}`]) return { col, dayIndex: d };
+    }
+  }
+  return null;
+}
+
 function renderTracker(who) {
-  const done = JSON.parse(localStorage.getItem(trackerKey(who)) || '{}');
-  const head = Array.from({ length: 12 }, (_, i) => `<th>${i + 1}</th>`).join('');
-  const rows = [...DAY_KEYS].map((day, dayIndex) => {
-    const cells = Array.from({ length: 12 }, (_, i) => {
+  const done = readTracker(who);
+  const cols = trackerCols(who);
+  const colLabel = PLANS[who].rotation ? 'Круг' : 'Неделя';
+  const head = Array.from({ length: cols }, (_, i) => `<th>${i + 1}</th>`).join('');
+  const rows = [...DAY_KEYS.slice(0, dayCount(who))].map((day, dayIndex) => {
+    const cells = Array.from({ length: cols }, (_, i) => {
       const key = `${i + 1}${day}`;
-      return `<td><input type="checkbox" data-track="${key}" ${done[key] ? 'checked' : ''} aria-label="Неделя ${i + 1}, ${workoutLabel(dayIndex).toLowerCase()}"></td>`;
+      return `<td><input type="checkbox" data-track="${key}" ${done[key] ? 'checked' : ''} aria-label="${colLabel} ${i + 1}, ${workoutLabel(dayIndex).toLowerCase()}"></td>`;
     }).join('');
     return `<tr><th>${workoutLabel(dayIndex)}</th>${cells}</tr>`;
   }).join('');
   return `
     <h2>Отметки о тренировках</h2>
     <p class="muted">Сохраняются в этом браузере.</p>
-    <div class="tracker card"><table><tr><th>Неделя</th>${head}</tr>${rows}</table></div>`;
+    <div class="tracker card"><table><tr><th>${colLabel}</th>${head}</tr>${rows}</table></div>`;
+}
+
+function nextBanner(who) {
+  const plan = PLANS[who];
+  const next = nextWorkout(who);
+  if (!plan.rotation || !next) return '';
+  const day = plan.phases[state.phase[who]].days[next.dayIndex];
+  return `
+    <div class="next-banner">
+      <div><span class="muted">Следующая по кругу · круг ${next.col}</span><b>${workoutLabel(next.dayIndex)} · ${esc(cap(day.name))}</b></div>
+      <button class="btn" data-start="${next.dayIndex}">▶ К тренировке</button>
+    </div>`;
 }
 
 const doseList = (items) => `<table class="workout">${items.map(([id, dose]) =>
@@ -200,6 +230,7 @@ function renderPlan(who) {
     <h1>${plan.title}</h1>
     <p class="muted">${plan.profile}</p>
     <p>${plan.goal}</p>
+    ${nextBanner(who)}
     <div class="tabs">${tabs}</div>
     <div class="rule"><b>${esc(phase.name)}.</b> ${esc(phase.rule)}
       <div class="rest-setting">

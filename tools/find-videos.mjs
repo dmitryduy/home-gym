@@ -46,7 +46,7 @@ const OVERRIDES = {
 
 // Ролики, которые не проигрываются во встроенном плеере (см. tools/check-embeds.mjs)
 const EXCLUDE = new Set(['9M8ylnbriB0', 'IfESGr170DY', 'LORVjN2bg5o', 'eG20L9cl81w', 'fUGQ7oMEIFI',
-  'V01aVqxOhbU', 'rA_cC0Y6TWI', 'lpBiGVoUFMA', 'vm0zV_WQerE', 'nHbNc-WwLU8', 'YO9bbyrgJkI', 'L91QMACdA6Q',
+  'V01aVqxOhbU', 'rA_cC0Y6TWI', 'lpBiGVoUFMA', 'vm0zV_WQerE', 'nHbNc-WwLU8', 'YO9bbyrgJkI', 'L91QMACdA6Q', 'RDFL4Bh2SSY',
   // Не показ техники
   'HLyDdQUsC1U']);
 

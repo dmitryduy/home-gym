@@ -52,6 +52,7 @@ function startWorkout(who, phaseIndex, dayIndex) {
     title: day.name, startedAt: Date.now(),
   });
   player.classList.remove('overview');
+  player.innerHTML = '';
   player.hidden = false;
   document.body.style.overflow = 'hidden';
   renderStep();
@@ -152,6 +153,8 @@ function nextExerciseStep(from) {
   return run.steps.slice(from + 1).find((s) => s.type !== 'rest');
 }
 
+const nextOtherExercise = (from, id) => run.steps.slice(from + 1).find((s) => s.type !== 'rest' && s.id !== id)?.id;
+
 function stepTitle(step) {
   const ex = byId[step.id];
   if (step.type === 'set') return { name: ex.name, meta: `${formatReps(step.reps)} · подход ${step.set} из ${step.sets}` };
@@ -191,31 +194,91 @@ function queueList() {
   }).join('');
 }
 
-function shell(content, { button, buttonClass = '' }) {
-  const done = run.index;
-  const total = run.steps.length;
-  const left = total - done - 1;
+// Каркас плеера строится один раз на тренировку: видеоблок не пересоздаётся между шагами
+function buildLayout() {
   player.innerHTML = `
     <div class="player__top">
       <button class="player__close" data-action="close" aria-label="Закрыть">×</button>
       <div class="player__title"><b>${WHO_LABEL[run.who]} · ${workoutLabel(run.dayIndex)}</b><span>${esc(cap(run.title))}</span></div>
-      <div class="player__count">${done + 1} / ${total}</div>
+      <div class="player__count"></div>
     </div>
-    <div class="player__progress"><i style="width:${(done / total) * 100}%"></i></div>
-    <div class="player__scroll">${content}</div>
-    <div class="player__bottom" data-swipe="open">
-      <button class="sheet-handle" data-action="sheet-open"><i class="sheet-grip"></i><span>⌃ Вся тренировка · осталось ${left}</span></button>
-      ${nextUp(run.index)}
-      <button class="player__cta ${buttonClass}" data-action="next">${button}</button>
+    <div class="player__progress"><i></i></div>
+    <div class="player__scroll pv">
+      <div class="pv-head"></div>
+      <div class="video-host"></div>
+      <a class="video__src" target="_blank" rel="noopener"></a>
+      <div class="pv-body"></div>
     </div>
+    <div class="player__bottom" data-swipe="open"></div>
     <div class="sheet-backdrop" data-action="sheet-close"></div>
     <section class="sheet" aria-label="Вся тренировка">
       <div class="sheet__head" data-swipe="close" data-action="sheet-close">
         <i class="sheet-grip"></i>
-        <b>⌄ Вся тренировка · осталось ${left}</b>
+        <b class="sheet__title"></b>
       </div>
-      <ul class="queue">${queueList()}</ul>
+      <ul class="queue"></ul>
     </section>`;
+}
+
+function createFrame(v) {
+  const frame = document.createElement('iframe');
+  frame.src = `https://www.youtube-nocookie.com/embed/${v.id}?autoplay=1&mute=1&loop=1&playlist=${v.id}&playsinline=1&rel=0&modestbranding=1`;
+  frame.title = v.title;
+  frame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+  frame.referrerPolicy = 'strict-origin-when-cross-origin';
+  frame.allowFullscreen = true;
+  frame.dataset.v = v.id;
+  return frame;
+}
+
+// Показывает ролик упражнения exId и держит в фоне загруженный ролик preloadId
+function syncVideo(exId, preloadId) {
+  const host = player.querySelector('.video-host');
+  const link = player.querySelector('.video__src');
+  const v = exId ? videoOf(exId) : null;
+  const pre = preloadId ? videoOf(preloadId) : null;
+  host.hidden = !exId;
+  link.hidden = !v;
+  if (!exId) return;
+
+  const keep = new Set([v?.id, pre?.id].filter(Boolean));
+  host.querySelectorAll('iframe').forEach((f) => {
+    if (!keep.has(f.dataset.v)) f.remove();
+  });
+  host.querySelector('.video-host__fallback')?.remove();
+
+  if (!v) {
+    const ex = byId[exId];
+    host.style.backgroundImage = '';
+    host.insertAdjacentHTML('beforeend', `<a class="btn btn--lime video-host__fallback" href="${ytSearch(ex.heria ? `Chris Heria ${ex.en}` : `${ex.en} proper form`)}" target="_blank" rel="noopener">▶ Найти видео на YouTube</a>`);
+  } else {
+    host.style.backgroundImage = `url(https://i.ytimg.com/vi/${v.id}/hqdefault.jpg)`;
+    link.href = `https://www.youtube.com/watch?v=${v.id}`;
+    link.textContent = `${v.author} · открыть на YouTube ↗`;
+  }
+  [v, pre].forEach((item) => {
+    if (item && !host.querySelector(`iframe[data-v="${item.id}"]`)) host.append(createFrame(item));
+  });
+  host.querySelectorAll('iframe').forEach((f) => f.classList.toggle('is-active', f.dataset.v === v?.id));
+}
+
+function shell({ head, body = '', button, buttonClass = '', video, preload }) {
+  if (!player.querySelector('.pv')) buildLayout();
+  const done = run.index;
+  const total = run.steps.length;
+  const left = total - done - 1;
+  player.querySelector('.player__count').textContent = `${done + 1} / ${total}`;
+  player.querySelector('.player__progress i').style.width = `${(done / total) * 100}%`;
+  player.querySelector('.pv-head').innerHTML = head;
+  player.querySelector('.pv-body').innerHTML = body;
+  player.querySelector('.player__bottom').innerHTML = `
+    <button class="sheet-handle" data-action="sheet-open"><i class="sheet-grip"></i><span>⌃ Вся тренировка · осталось ${left}</span></button>
+    ${nextUp(run.index)}
+    <button class="player__cta ${buttonClass}" data-action="next">${button}</button>`;
+  player.querySelector('.sheet__title').textContent = `⌄ Вся тренировка · осталось ${left}`;
+  player.querySelector('.queue').innerHTML = queueList();
+  player.querySelector('.pv').scrollTop = 0;
+  syncVideo(video, preload);
 }
 
 function setSheet(open) {
@@ -250,14 +313,18 @@ function renderStep() {
         <div class="stage__reps"><span class="eyebrow">Осталось</span><b id="clock-big">${fmt(step.sec)}</b></div>
       </div>`;
 
-  shell(`
-    ${head}
-    <div class="clock"><span class="eyebrow">${isSet ? 'Время подхода' : 'Таймер'}</span><b id="clock">${isSet ? '00:00' : fmt(step.sec)}</b>
-      <button class="chip-btn" data-action="pause">⏸ Пауза</button></div>
-    ${videoBlock(step.id)}
-    ${step.note ? `<p class="player__note">💡 ${esc(step.note)}</p>` : ''}
-    <ul class="player__cues">${ex.cues.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>`,
-  { button: isSet ? 'Подход выполнен →' : 'Дальше →' });
+  shell({
+    head: `
+      ${head}
+      <div class="clock"><span class="eyebrow">${isSet ? 'Время подхода' : 'Таймер'}</span><b id="clock">${isSet ? '00:00' : fmt(step.sec)}</b>
+        <button class="chip-btn" data-action="pause">⏸ Пауза</button></div>`,
+    body: `
+      ${step.note ? `<p class="player__note">💡 ${esc(step.note)}</p>` : ''}
+      <ul class="player__cues">${ex.cues.map((c) => `<li>${esc(c)}</li>`).join('')}</ul>`,
+    button: isSet ? 'Подход выполнен →' : 'Дальше →',
+    video: step.id,
+    preload: nextOtherExercise(run.index, step.id),
+  });
 
   if (isSet) {
     run.elapsed = 0;
@@ -294,19 +361,27 @@ function renderRest(step) {
   run.left = sec;
   run.restTotal = sec;
   run.restKind = step.kind;
-  shell(`
-    <div class="rest">
-      <span class="eyebrow">${isEx ? 'Отдых перед следующим упражнением' : 'Отдых между подходами'}</span>
-      <div class="rest__ring" style="--p:1"><b id="rest-clock">${fmt(sec)}</b></div>
-      <div class="rest__actions">
-        <button class="chip-btn" data-action="minus">−15 с</button>
-        <button class="chip-btn" data-action="pause">⏸ Пауза</button>
-        <button class="chip-btn" data-action="plus">+15 с</button>
-      </div>
-      ${isEx
+  const next = nextExerciseStep(run.index);
+  shell({
+    head: `
+      <div class="rest">
+        <span class="eyebrow">${isEx ? 'Отдых перед следующим упражнением' : 'Отдых между подходами'}</span>
+        <div class="rest__ring" style="--p:1"><b id="rest-clock">${fmt(sec)}</b></div>
+        <div class="rest__actions">
+          <button class="chip-btn" data-action="minus">−15 с</button>
+          <button class="chip-btn" data-action="pause">⏸ Пауза</button>
+          <button class="chip-btn" data-action="plus">+15 с</button>
+        </div>
+        ${isEx
     ? `<p class="rest__setting">Отдых между упражнениями: <b id="ex-rest-value">${fmt(getExRest())}</b><br><span>−15 / +15 меняют и эту настройку для следующих переходов</span></p>`
     : '<p class="muted">Дыши ровно, попей воды. По окончании прозвучит сигнал.</p>'}
-    </div>`, { button: 'Пропустить отдых →', buttonClass: 'player__cta--ghost' });
+        ${next ? `<p class="rest__next"><span class="eyebrow">Далее</span>${esc(byId[next.id].name)}</p>` : ''}
+      </div>`,
+    button: 'Пропустить отдых →',
+    buttonClass: 'player__cta--ghost',
+    video: next?.id,
+    preload: next && nextOtherExercise(run.index, next.id),
+  });
 
   tick(() => {
     run.left -= 1;
@@ -331,7 +406,7 @@ function adjustRest(delta) {
 function markTracker() {
   const key = trackerKey(run.who);
   const done = JSON.parse(localStorage.getItem(key) || '{}');
-  for (let w = 1; w <= 12; w += 1) {
+  for (let w = 1; w <= trackerCols(run.who); w += 1) {
     if (!done[`${w}${run.dayLetter}`]) {
       done[`${w}${run.dayLetter}`] = true;
       localStorage.setItem(key, JSON.stringify(done));
@@ -352,7 +427,7 @@ function renderFinish() {
       <div class="finish__icon">✓</div>
       <h2>Тренировка завершена</h2>
       <p>${WHO_LABEL[run.who]} · ${workoutLabel(run.dayIndex)} · ${minutes} мин</p>
-      ${week ? `<p class="muted">Отмечено в трекере: неделя ${week}, ${workoutLabel(run.dayIndex).toLowerCase()}.</p>` : ''}
+      ${week ? `<p class="muted">Отмечено в трекере: ${PLANS[run.who].rotation ? 'круг' : 'неделя'} ${week}, ${workoutLabel(run.dayIndex).toLowerCase()}.</p>` : ''}
       <button class="player__cta" data-action="close">Готово</button>
     </div>`;
 }

@@ -163,10 +163,10 @@ const VIDEOS = {
     "seconds": 17
   },
   "incline-db-press": {
-    "id": "RDFL4Bh2SSY",
-    "title": "Incline Dumbbell Press: Perfect Form for Upper Chest Growth! 🔥 #shorts",
-    "author": "Muscle Mechanics",
-    "seconds": 10
+    "id": "19CNsXpSXS0",
+    "title": "Incline Dumbbell Chest Press",
+    "author": "Coach Mark",
+    "seconds": 11
   },
   "db-fly": {
     "id": "NPpxSKOvMwE",

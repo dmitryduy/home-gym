@@ -58,7 +58,9 @@ for (let i = 0; i < entries.length; i += BATCH) {
     const { result: att } = await send('Target.attachToTarget', { targetId: frame.targetId, flatten: true });
     const text = (await send('Runtime.evaluate', { expression: 'document.body.innerText', returnByValue: true }, att.sessionId)).result?.result?.value || '';
     await send('Target.detachFromTarget', { sessionId: att.sessionId });
-    if (/video is unavailable|видео недоступно|an error occurred|произошла ошибка/i.test(text)) broken.push({ exId, id: v.id, why: text.split('\n')[0] });
+    const oembed = await fetch(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${v.id}&format=json`).then((r) => r.status).catch(() => 0);
+    if (oembed !== 200) broken.push({ exId, id: v.id, why: `oEmbed ${oembed}` });
+    else if (/video (is )?unavailable|видео недоступно|error occurred|произошла ошибка/i.test(text)) broken.push({ exId, id: v.id, why: text.split('\n')[0] });
   }
   process.stderr.write(`проверено ${Math.min(i + BATCH, entries.length)} / ${entries.length}\n`);
 }
